@@ -257,7 +257,7 @@
             650.0,
             20.0
           ],
-          "text": "Attributes: @port <1-65535>, @multicast <IPv4 group|none>, @autostart <0|1>"
+          "text": "Attributes: @port, @multicast <IPv4 group|none>, @localaddr <IPv4|any>, @autostart"
         }
       },
       {

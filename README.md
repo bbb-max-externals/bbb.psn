@@ -24,6 +24,7 @@ Default settings follow the PSN defaults:
 
 - `@port` — UDP port.
 - `@multicast` — multicast group address. Use `none`, `off`, `false`, `0`, or `unicast` to disable multicast join for unicast receiving.
+- `@localaddr` — local IPv4 address used when joining a multicast group. Use `any` or `0.0.0.0` for OS default.
 - `@autostart` — start on object creation.
 
 #### Outlets
@@ -57,8 +58,9 @@ Default settings follow the PSN defaults:
 
 #### Attributes
 
-- `@destination` — IPv4 destination address.
+- `@destination` — IPv4 destination address. Use `236.10.10.10` for standard PSN multicast.
 - `@port` — UDP destination port.
+- `@localaddr` — local IPv4 address used as the multicast output interface. Use `any` or `0.0.0.0` for OS routing.
 - `@system` — PSN system/server name for info packets.
 
 #### Outlet
@@ -66,6 +68,33 @@ Default settings follow the PSN defaults:
 1. Info/status: `sent <data|info> <packet-count>`, `error <message>`
 
 
+
+
+## Multicast to grandMA3
+
+For standard PSN multicast, send to `236.10.10.10:56565` and explicitly select the NIC that is on the grandMA3 network. On this machine, if the grandMA3 network address is `192.168.0.222`, use:
+
+```max
+bbb.psn.sender @destination 236.10.10.10 @port 56565 @localaddr 192.168.0.222 @system MaxPSN
+```
+
+Then send at least one tracker definition and continuous data:
+
+```max
+name 1 performer
+info
+tracker 1 1. 2. 3. 0. 0. 0.
+```
+
+Drive `bang`/`send` continuously with a `metro`, for example 30 Hz. A single packet is a weak test for PSN receivers.
+
+grandMA3 onPC must also listen on the NIC connected to this network and allow UDP `56565` through Windows Firewall. Wireshark seeing packets does not prove grandMA3 onPC is allowed to receive them.
+
+For local multicast receive tests on this same machine, use matching receiver interface selection:
+
+```max
+bbb.psn.receiver @multicast 236.10.10.10 @localaddr 192.168.0.222 @port 56565
+```
 
 ## Local loopback test
 

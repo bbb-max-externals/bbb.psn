@@ -72,6 +72,10 @@ bool parse_ipv4_address(const std::string &address, in_addr &result) {
 	return inet_pton(AF_INET, address.c_str(), &result) == 1;
 }
 
+bool address_is_any(const std::string &address) {
+	return address.empty() || address == "any" || address == "0.0.0.0";
+}
+
 std::string socket_error_text(const std::string &prefix) {
 #ifdef _WIN32
 	return prefix + " (WSA error " + std::to_string(WSAGetLastError()) + ")";
@@ -92,7 +96,7 @@ bool multicast_is_disabled(const std::string &multicast_address) {
 	return value.empty() || value == "none" || value == "off" || value == "false" || value == "0" || value == "unicast";
 }
 
-bool join_multicast_group(socket_handle socket, const std::string &multicast_address) {
+bool join_multicast_group(socket_handle socket, const std::string &multicast_address, const std::string &local_address) {
 	if(multicast_is_disabled(multicast_address)) {
 		return true;
 	}
@@ -101,7 +105,13 @@ bool join_multicast_group(socket_handle socket, const std::string &multicast_add
 	if(!parse_ipv4_address(multicast_address, request.imr_multiaddr)) {
 		return false;
 	}
-	request.imr_interface.s_addr = htonl(INADDR_ANY);
+
+	if(address_is_any(local_address)) {
+		request.imr_interface.s_addr = htonl(INADDR_ANY);
+	} else if(!parse_ipv4_address(local_address, request.imr_interface)) {
+		return false;
+	}
+
 	return 0 <= setsockopt(socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&request, sizeof(request));
 }
 
@@ -117,7 +127,7 @@ public:
 		close();
 	}
 
-	bool open(uint16_t port, const std::string &multicast_address, std::string &error) {
+	bool open(uint16_t port, const std::string &multicast_address, const std::string &local_address, std::string &error) {
 		close();
 
 #ifdef _WIN32
@@ -152,8 +162,8 @@ public:
 			return false;
 		}
 
-		if(!join_multicast_group(socket_, multicast_address)) {
-			error = socket_error_text("multicast join failed");
+		if(!join_multicast_group(socket_, multicast_address, local_address)) {
+			error = socket_error_text("multicast join failed for localaddr " + local_address);
 			close();
 			return false;
 		}
@@ -221,6 +231,10 @@ public:
 
 	c74::min::attribute<c74::min::symbol> multicast{this, "multicast", psn::DEFAULT_UDP_MULTICAST_ADDR,
 		c74::min::description{"IPv4 multicast group to join. Use none/off/false/0/unicast to disable multicast join for unicast receiving."}
+	};
+
+	c74::min::attribute<c74::min::symbol> localaddr{this, "localaddr", "any",
+		c74::min::description{"Local IPv4 address to use when joining a multicast group. Use any/0.0.0.0 for OS default."}
 	};
 
 	c74::min::attribute<bool> autostart{this, "autostart", true,
@@ -300,10 +314,12 @@ private:
 
 		const c74::min::atoms multicast_atoms{multicast.get_atoms()};
 		const std::string requested_multicast{multicast_atoms.empty() ? "" : std::string(multicast_atoms[0])};
+		const c74::min::atoms local_address_atoms{localaddr.get_atoms()};
+		const std::string requested_local_address{local_address_atoms.empty() ? "any" : std::string(local_address_atoms[0])};
 
 		running_.store(true);
-		worker_ = std::thread([this, requested_port, requested_multicast]() {
-			receive_loop((uint16_t)requested_port, requested_multicast);
+		worker_ = std::thread([this, requested_port, requested_multicast, requested_local_address]() {
+			receive_loop((uint16_t)requested_port, requested_multicast, requested_local_address);
 		});
 	}
 
@@ -320,10 +336,10 @@ private:
 		}
 	}
 
-	void receive_loop(uint16_t requested_port, const std::string requested_multicast) {
+	void receive_loop(uint16_t requested_port, const std::string requested_multicast, const std::string requested_local_address) {
 		udp_receiver receiver;
 		std::string error;
-		if(!receiver.open(requested_port, requested_multicast, error)) {
+		if(!receiver.open(requested_port, requested_multicast, requested_local_address, error)) {
 			running_.store(false);
 			push_info({"error", error});
 			push_info({"status", 0});

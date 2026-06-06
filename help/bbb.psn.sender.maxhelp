@@ -181,7 +181,7 @@
           "outlettype": [
             ""
           ],
-          "text": "bbb.psn.sender @destination 236.10.10.10 @port 56565 @system Max"
+          "text": "bbb.psn.sender @destination 236.10.10.10 @port 56565 @localaddr any @system Max"
         }
       },
       {
@@ -241,7 +241,7 @@
             385.0,
             20.0
           ],
-          "text": "Outlet: sent <data|info> <packet-count>, error <message>"
+          "text": "Attributes: @destination, @port, @localaddr, @system. Outlet: sent <data|info> <packet-count>, error <message>"
         }
       }
     ],

@@ -55,6 +55,19 @@ std::string socket_error_text(const std::string &prefix) {
 #endif
 }
 
+bool address_is_any(const std::string &address) {
+	return address.empty() || address == "any" || address == "0.0.0.0";
+}
+
+bool parse_ipv4_address(const std::string &address, in_addr &result) {
+	return inet_pton(AF_INET, address.c_str(), &result) == 1;
+}
+
+bool address_is_multicast(const in_addr &address) {
+	const uint32_t host_order_address{ntohl(address.s_addr)};
+	return 0xE0000000 <= host_order_address && host_order_address <= 0xEFFFFFFF;
+}
+
 class udp_sender {
 public:
 	udp_sender() = default;
@@ -93,7 +106,7 @@ public:
 		return true;
 	}
 
-	bool send(const std::string &destination, uint16_t port, const std::string &packet, std::string &error) {
+	bool send(const std::string &destination, const std::string &local_address, uint16_t port, const std::string &packet, std::string &error) {
 		if(!open(error)) {
 			return false;
 		}
@@ -101,8 +114,12 @@ public:
 		sockaddr_in address{};
 		address.sin_family = AF_INET;
 		address.sin_port = htons(port);
-		if(inet_pton(AF_INET, destination.c_str(), &address.sin_addr) != 1) {
+		if(!parse_ipv4_address(destination, address.sin_addr)) {
 			error = "invalid IPv4 destination: " + destination;
+			return false;
+		}
+
+		if(address_is_multicast(address.sin_addr) && !set_multicast_interface(local_address, error)) {
 			return false;
 		}
 
@@ -111,6 +128,25 @@ public:
 			error = socket_error_text("sendto failed");
 			return false;
 		}
+		return true;
+	}
+
+	bool set_multicast_interface(const std::string &local_address, std::string &error) {
+		if(address_is_any(local_address)) {
+			return true;
+		}
+
+		in_addr interface_address{};
+		if(!parse_ipv4_address(local_address, interface_address)) {
+			error = "invalid IPv4 localaddr: " + local_address;
+			return false;
+		}
+
+		if(setsockopt(socket_, IPPROTO_IP, IP_MULTICAST_IF, (const char *)&interface_address, sizeof(interface_address)) < 0) {
+			error = socket_error_text("IP_MULTICAST_IF failed");
+			return false;
+		}
+
 		return true;
 	}
 
@@ -183,6 +219,10 @@ public:
 	c74::min::attribute<int> port{this, "port", (int)psn::DEFAULT_UDP_PORT,
 		c74::min::description{"UDP destination port."},
 		c74::min::range{1, 65535}
+	};
+
+	c74::min::attribute<c74::min::symbol> localaddr{this, "localaddr", "any",
+		c74::min::description{"Local IPv4 address to use as the multicast output interface. Use any/0.0.0.0 for OS routing."}
 	};
 
 	c74::min::attribute<c74::min::symbol> system{this, "system", "Max",
@@ -389,10 +429,11 @@ private:
 		}
 
 		const std::string requested_destination = attribute_symbol_to_string(destination);
+		const std::string requested_local_address = attribute_symbol_to_string(localaddr);
 		std::string send_error;
 		int sent_count{0};
 		for(const auto &packet : packets) {
-			if(!sender_.send(requested_destination, (uint16_t)requested_port, packet, send_error)) {
+			if(!sender_.send(requested_destination, requested_local_address, (uint16_t)requested_port, packet, send_error)) {
 				error(send_error);
 				return;
 			}

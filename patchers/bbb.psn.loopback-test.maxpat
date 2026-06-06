@@ -281,7 +281,7 @@
           "outlettype": [
             ""
           ],
-          "text": "bbb.psn.sender @destination 127.0.0.1 @port 56565 @system LocalMax"
+          "text": "bbb.psn.sender @destination 127.0.0.1 @port 56565 @localaddr any @system LocalMax"
         }
       },
       {
