@@ -1,6 +1,7 @@
 name: Build & Package
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -26,11 +27,12 @@ jobs:
           lipo -info externals/bbb.psn.receiver.mxo/Contents/MacOS/bbb.psn.receiver | grep -E 'x86_64.*arm64|arm64.*x86_64'
           lipo -info externals/bbb.psn.sender.mxo/Contents/MacOS/bbb.psn.sender | grep -E 'x86_64.*arm64|arm64.*x86_64'
 
-      - name: Upload externals
+      - name: Upload macOS externals
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-macos
+          name: ${{ github.event.repository.name }}-macos-externals
           path: externals/
+          retention-days: 14
 
   build-windows:
     runs-on: windows-latest
@@ -42,11 +44,12 @@ jobs:
       - name: Configure and Build
         run: cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release
 
-      - name: Upload externals
+      - name: Upload Windows externals
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-windows
+          name: ${{ github.event.repository.name }}-windows-externals
           path: externals/
+          retention-days: 14
 
   package:
     permissions:
@@ -59,13 +62,13 @@ jobs:
       - name: Download macOS externals
         uses: actions/download-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-macos
+          name: ${{ github.event.repository.name }}-macos-externals
           path: dist/${{ github.event.repository.name }}/externals/
 
       - name: Download Windows externals
         uses: actions/download-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-windows
+          name: ${{ github.event.repository.name }}-windows-externals
           path: dist/${{ github.event.repository.name }}/externals/
 
       - name: Assemble package
@@ -76,19 +79,20 @@ jobs:
           cp -r help "dist/${{ github.event.repository.name }}/"
           cp LICENSE "dist/${{ github.event.repository.name }}/" 2>/dev/null || true
 
-      - name: Create archive
+      - name: Create latest build zip
         run: |
           cd dist
-          zip -r "${{ github.event.repository.name }}.zip" "${{ github.event.repository.name }}/"
+          zip -r "${{ github.event.repository.name }}-latest-build.zip" "${{ github.event.repository.name }}/"
 
-      - name: Upload artifact
+      - name: Upload latest build zip
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-latest
-          path: dist/*.zip
+          name: ${{ github.event.repository.name }}-latest-build-zip
+          path: dist/${{ github.event.repository.name }}-latest-build.zip
+          retention-days: 30
 
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/${{ github.event.repository.name }}-latest-build.zip

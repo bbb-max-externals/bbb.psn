@@ -65,6 +65,16 @@ Default settings follow the PSN defaults:
 
 1. Info/status: `sent <data|info> <packet-count>`, `error <message>`
 
+
+## Latest CI build
+
+GitHub Actions creates a downloadable package artifact on every `main` push, pull request, release, and manual workflow run.
+
+1. Open **Actions** → **Build & Package**.
+2. Open the latest successful run.
+3. Download the artifact named `<repository-name>-latest-build-zip`.
+4. Inside it is `<repository-name>-latest-build.zip`, containing both macOS `.mxo` and Windows `.mxe64` externals plus help and package metadata.
+
 ## Build
 
 ```bash
