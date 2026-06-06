@@ -22,7 +22,9 @@ jobs:
       - name: Verify universal binary
         run: |
           test -d externals/bbb.psn.receiver.mxo
+          test -d externals/bbb.psn.sender.mxo
           lipo -info externals/bbb.psn.receiver.mxo/Contents/MacOS/bbb.psn.receiver | grep -E 'x86_64.*arm64|arm64.*x86_64'
+          lipo -info externals/bbb.psn.sender.mxo/Contents/MacOS/bbb.psn.sender | grep -E 'x86_64.*arm64|arm64.*x86_64'
 
       - name: Upload externals
         uses: actions/upload-artifact@v4

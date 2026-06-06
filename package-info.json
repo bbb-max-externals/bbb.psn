@@ -9,17 +9,28 @@
 	"max_version_min": "8.0",
 	"os": {
 		"macintosh": {
-			"externals": ["externals/"],
-			"help": ["help/"]
+			"externals": [
+				"externals/"
+			],
+			"help": [
+				"help/"
+			]
 		},
 		"windows": {
-			"externals": ["externals/"],
-			"help": ["help/"]
+			"externals": [
+				"externals/"
+			],
+			"help": [
+				"help/"
+			]
 		}
 	},
 	"filelist": {
 		"externals/bbb.psn.receiver.mxo": {},
 		"externals/bbb.psn.receiver.mxe64": {},
-		"help/bbb.psn.receiver.maxhelp": {}
+		"help/bbb.psn.receiver.maxhelp": {},
+		"externals/bbb.psn.sender.mxo": {},
+		"externals/bbb.psn.sender.mxe64": {},
+		"help/bbb.psn.sender.maxhelp": {}
 	}
 }
