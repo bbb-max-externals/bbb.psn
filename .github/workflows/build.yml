@@ -91,7 +91,31 @@ jobs:
           path: dist/${{ github.event.repository.name }}-latest-build.zip
           retention-days: 30
 
-      - name: Upload to Release
+      - name: Publish latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest "${{ github.sha }}"
+          git push --force origin refs/tags/latest
+          if ! gh release view latest --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create latest \
+              --repo "${{ github.repository }}" \
+              --title "Latest CI Build" \
+              --notes "Automated latest build from main."
+          fi
+          gh release edit latest \
+            --repo "${{ github.repository }}" \
+            --title "Latest CI Build" \
+            --notes "Automated latest build from main commit ${{ github.sha }}."
+          gh release upload latest \
+            "dist/${{ github.event.repository.name }}-latest-build.zip" \
+            --repo "${{ github.repository }}" \
+            --clobber
+
+      - name: Upload to tagged Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:

@@ -68,12 +68,11 @@ Default settings follow the PSN defaults:
 
 ## Latest CI build
 
-GitHub Actions creates a downloadable package artifact on every `main` push, pull request, release, and manual workflow run.
+GitHub Actions creates a downloadable package on every `main` push, pull request, release, and manual workflow run.
 
-1. Open **Actions** → **Build & Package**.
-2. Open the latest successful run.
-3. Download the artifact named `<repository-name>-latest-build-zip`.
-4. Inside it is `<repository-name>-latest-build.zip`, containing both macOS `.mxo` and Windows `.mxe64` externals plus help and package metadata.
+- For normal downloads, open **Releases** and download `<repository-name>-latest-build.zip` from the `latest` release.
+- For per-run artifacts, open **Actions** → **Build & Package** → latest successful run, then download `<repository-name>-latest-build-zip`.
+- The zip contains both macOS `.mxo` and Windows `.mxe64` externals plus help and package metadata.
 
 ## Build
 
