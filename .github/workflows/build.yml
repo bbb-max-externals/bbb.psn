@@ -77,6 +77,7 @@ jobs:
           cp package-info.json "dist/${{ github.event.repository.name }}/"
           cp README.md "dist/${{ github.event.repository.name }}/"
           cp -r help "dist/${{ github.event.repository.name }}/"
+          cp -r patchers "dist/${{ github.event.repository.name }}/"
           cp LICENSE "dist/${{ github.event.repository.name }}/" 2>/dev/null || true
 
       - name: Create latest build zip

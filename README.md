@@ -66,6 +66,30 @@ Default settings follow the PSN defaults:
 1. Info/status: `sent <data|info> <packet-count>`, `error <message>`
 
 
+
+## Local loopback test
+
+Use `patchers/bbb.psn.loopback-test.maxpat` to test `bbb.psn.sender` and `bbb.psn.receiver` on one machine.
+
+Basic sequence:
+
+1. Build the externals and make sure Max can find this package folder.
+2. Open `patchers/bbb.psn.loopback-test.maxpat`.
+3. Click `start` on `bbb.psn.receiver`. You should see `status 1` in `print psn-rx-info`.
+4. Click `name 1 performer`, then `info`. You should see `server LocalMax` and `name 1 performer`.
+5. Click `tracker 1 1. 2. 3. 10. 20. 30.`, then click the bang connected to sender. You should see a `tracker ...` message in `print psn-rx-data`.
+
+Important: `bbb.psn.sender` does not send any data packet until at least one tracker exists. If you only bang a fresh sender, it reports `sent data 0` and the receiver correctly outputs nothing.
+
+If Wireshark shows UDP packets but Max prints nothing, check these in order:
+
+- Receiver is actually started and prints `status 1`.
+- Sender and receiver use the same port.
+- You sent `tracker ...` before `bang`/`send`.
+- The packet is PSN, not merely arbitrary UDP to the port.
+- For unicast tests, set sender `@destination` to `127.0.0.1` or your local interface IP.
+- For multicast tests, keep destination `236.10.10.10`; some systems or network setups may suppress multicast loopback.
+
 ## Latest CI build
 
 GitHub Actions creates a downloadable package on every `main` push, pull request, release, and manual workflow run.
