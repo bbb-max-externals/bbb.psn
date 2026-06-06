@@ -77,7 +77,7 @@
             680.0,
             20.0
           ],
-          "text": "Default: port 56565, multicast 236.10.10.10. Output tracker and info/status messages."
+          "text": "Default: port 56565, multicast 236.10.10.10. Use multicast none for unicast receiving."
         }
       },
       {
@@ -257,7 +257,7 @@
             650.0,
             20.0
           ],
-          "text": "Attributes: @port <1-65535>, @multicast <IPv4 group or empty>, @autostart <0|1>"
+          "text": "Attributes: @port <1-65535>, @multicast <IPv4 group|none>, @autostart <0|1>"
         }
       },
       {
@@ -293,7 +293,7 @@
           "outlettype": [
             ""
           ],
-          "text": "multicast 236.10.10.10"
+          "text": "multicast none"
         }
       },
       {

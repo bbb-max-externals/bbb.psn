@@ -9,9 +9,11 @@
 #include "c74_min.h"
 #include "psn_lib.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cerrno>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -78,8 +80,20 @@ std::string socket_error_text(const std::string &prefix) {
 #endif
 }
 
+std::string normalized_symbol_text(std::string value) {
+	std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
+		return (char)std::tolower(character);
+	});
+	return value;
+}
+
+bool multicast_is_disabled(const std::string &multicast_address) {
+	const std::string value{normalized_symbol_text(multicast_address)};
+	return value.empty() || value == "none" || value == "off" || value == "false" || value == "0" || value == "unicast";
+}
+
 bool join_multicast_group(socket_handle socket, const std::string &multicast_address) {
-	if(multicast_address.empty()) {
+	if(multicast_is_disabled(multicast_address)) {
 		return true;
 	}
 
@@ -206,7 +220,7 @@ public:
 	};
 
 	c74::min::attribute<c74::min::symbol> multicast{this, "multicast", psn::DEFAULT_UDP_MULTICAST_ADDR,
-		c74::min::description{"IPv4 multicast group to join. Use an empty symbol to disable multicast."}
+		c74::min::description{"IPv4 multicast group to join. Use none/off/false/0/unicast to disable multicast join for unicast receiving."}
 	};
 
 	c74::min::attribute<bool> autostart{this, "autostart", true,

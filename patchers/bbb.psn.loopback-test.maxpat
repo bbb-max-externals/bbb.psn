@@ -132,7 +132,7 @@
             "",
             ""
           ],
-          "text": "bbb.psn.receiver @port 56565 @autostart 0"
+          "text": "bbb.psn.receiver @port 56565 @multicast none @autostart 0"
         }
       },
       {
@@ -177,7 +177,7 @@
             520.0,
             36.0
           ],
-          "text": "Receiver defaults to multicast join. For pure unicast testing, current object needs a reliable disable-multicast mode; see notes in README after this patch."
+          "text": "Receiver uses @multicast none here, so it binds the port without joining a multicast group."
         }
       },
       {
@@ -281,7 +281,7 @@
           "outlettype": [
             ""
           ],
-          "text": "bbb.psn.sender @destination 236.10.10.10 @port 56565 @system LocalMax"
+          "text": "bbb.psn.sender @destination 127.0.0.1 @port 56565 @system LocalMax"
         }
       },
       {
@@ -311,7 +311,7 @@
             480.0,
             38.0
           ],
-          "text": "This uses multicast loopback. If your OS/network blocks multicast loopback, use a unicast receiver mode after code update."
+          "text": "This patch uses unicast loopback. Use Wireshark display filter udp.port == 56565 if you need packet-level proof."
         }
       }
     ],
