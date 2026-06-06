@@ -1,0 +1,25 @@
+{
+	"title": "bbb.psn",
+	"description": "PosiStageNet receiver external for Max/MSP",
+	"author": "2bit",
+	"website": "",
+	"extends": "",
+	"extensible": 0,
+	"homepatcher": "",
+	"max_version_min": "8.0",
+	"os": {
+		"macintosh": {
+			"externals": ["externals/"],
+			"help": ["help/"]
+		},
+		"windows": {
+			"externals": ["externals/"],
+			"help": ["help/"]
+		}
+	},
+	"filelist": {
+		"externals/PosiStageNet.mxo": {},
+		"externals/PosiStageNet.mxe64": {},
+		"help/PosiStageNet.maxhelp": {}
+	}
+}
