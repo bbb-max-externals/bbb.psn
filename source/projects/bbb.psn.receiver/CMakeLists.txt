@@ -1,4 +1,4 @@
-project(PosiStageNet)
+project(bbb.psn.receiver)
 
 set(POSISTAGENET_DEPS)
 if(WIN32)

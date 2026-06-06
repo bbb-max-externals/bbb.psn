@@ -1,10 +1,10 @@
 # bbb.psn
 
-Max/MSP external package for receiving PosiStageNet (PSN) tracking data.
+Max/MSP external package for sending and receiving PosiStageNet (PSN) tracking data.
 
 ## Object
 
-### `PosiStageNet`
+### `bbb.psn.receiver`
 
 Receives PSN 2.x UDP packets and outputs decoded tracker data.
 
@@ -41,9 +41,9 @@ cmake --build build --config Release
 
 Outputs:
 
-- macOS: `externals/PosiStageNet.mxo` (universal x86_64 + arm64)
-- Windows: `externals/PosiStageNet.mxe64` (x64)
+- macOS: `externals/bbb.psn.receiver.mxo` (universal x86_64 + arm64)
+- Windows: `externals/bbb.psn.receiver.mxe64` (x64)
 
 ## Sources
 
-PSN decoding uses the official VYV header-only C++ implementation in `deps/psn-cpp`.
+PSN encoding/decoding uses the official VYV header-only C++ implementation in `deps/psn-cpp`.

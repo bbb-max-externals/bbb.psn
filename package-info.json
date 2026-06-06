@@ -1,6 +1,6 @@
 {
 	"title": "bbb.psn",
-	"description": "PosiStageNet receiver external for Max/MSP",
+	"description": "PosiStageNet sender/receiver externals for Max/MSP",
 	"author": "2bit",
 	"website": "",
 	"extends": "",
@@ -18,8 +18,8 @@
 		}
 	},
 	"filelist": {
-		"externals/PosiStageNet.mxo": {},
-		"externals/PosiStageNet.mxe64": {},
-		"help/PosiStageNet.maxhelp": {}
+		"externals/bbb.psn.receiver.mxo": {},
+		"externals/bbb.psn.receiver.mxe64": {},
+		"help/bbb.psn.receiver.maxhelp": {}
 	}
 }

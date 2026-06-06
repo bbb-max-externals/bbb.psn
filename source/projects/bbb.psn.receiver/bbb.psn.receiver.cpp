@@ -190,7 +190,7 @@ struct output_event {
 
 } // namespace
 
-class PosiStageNet : public c74::min::object<PosiStageNet> {
+class bbb_psn_receiver : public c74::min::object<bbb_psn_receiver> {
 public:
 	MIN_DESCRIPTION{"Receive and decode PosiStageNet tracking data over UDP"};
 	MIN_TAGS{"posistagenet, psn, tracking, udp, multicast"};
@@ -261,7 +261,7 @@ public:
 		}
 	};
 
-	~PosiStageNet() {
+	~bbb_psn_receiver() {
 		stop(false);
 	}
 
@@ -423,4 +423,4 @@ private:
 	std::map<int, std::string> tracker_names_;
 };
 
-MIN_EXTERNAL(PosiStageNet);
+MIN_EXTERNAL(bbb_psn_receiver);

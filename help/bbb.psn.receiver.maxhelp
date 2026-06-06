@@ -43,7 +43,7 @@
     "enablehscroll": 1,
     "enablevscroll": 1,
     "devicewidth": 0,
-    "description": "Help for PosiStageNet external",
+    "description": "Help for bbb.psn.receiver external",
     "digest": "Receive PosiStageNet tracker data",
     "tags": "posistagenet, psn, udp, tracking",
     "style": "",
@@ -182,7 +182,7 @@
             "",
             ""
           ],
-          "text": "PosiStageNet @autostart 0"
+          "text": "bbb.psn.receiver @autostart 0"
         }
       },
       {
