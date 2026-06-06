@@ -1,0 +1,15 @@
+[submodule ".agents/skills/max-external"]
+	path = .agents/skills/max-external
+	url = https://github.com/2bbb/max-external
+[submodule ".agents/skills/max-external-githubactions"]
+	path = .agents/skills/max-external-githubactions
+	url = https://github.com/2bbb/max-external-githubactions
+[submodule ".agents/skills/max-patgen"]
+	path = .agents/skills/max-patgen
+	url = https://github.com/2bbb/max-patgen
+[submodule "deps/min-api"]
+	path = deps/min-api
+	url = https://github.com/Cycling74/min-api
+[submodule "deps/psn-cpp"]
+	path = deps/psn-cpp
+	url = https://github.com/VYV/PSN-CPP
