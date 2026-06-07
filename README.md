@@ -27,6 +27,15 @@ Default settings follow the PSN defaults:
 - `@localaddr` — local IPv4 address used when joining a multicast group. Use `any` or `0.0.0.0` for OS default.
 - `@autostart` — start on object creation.
 
+
+#### Shared receiver instances
+
+`bbb.psn.receiver` uses one shared UDP socket/thread/decoder per `@port + @multicast + @localaddr` tuple. Multiple Max objects with the same tuple subscribe to the same internal receiver instead of binding duplicate sockets.
+
+This is intentional: duplicate UDP binds are OS-dependent and unreliable, especially for unicast. If you need the same PSN stream in multiple places, create multiple `bbb.psn.receiver` objects with the same attributes or split one receiver output in the patch; both avoid duplicate socket ownership.
+
+The `bang` message reports `status` and current `subscribers` count.
+
 #### Outlets
 
 1. Tracker data: `tracker <id> <name> <x> <y> <z> <yaw> <pitch> <roll> <status> <timestamp>`

@@ -16,7 +16,9 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -214,6 +216,251 @@ struct output_event {
 
 } // namespace
 
+class shared_psn_receiver {
+public:
+	struct tagged_callback {
+		void *owner;
+		std::function<void(const std::vector<output_event> &, const std::vector<output_event> &)> function;
+	};
+
+	shared_psn_receiver(uint16_t port, std::string multicast_address, std::string local_address)
+	: port_{port}
+	, multicast_address_{std::move(multicast_address)}
+	, local_address_{std::move(local_address)}
+	{}
+
+	shared_psn_receiver(const shared_psn_receiver &) = delete;
+	shared_psn_receiver(shared_psn_receiver &&) = delete;
+	shared_psn_receiver &operator=(const shared_psn_receiver &) = delete;
+	shared_psn_receiver &operator=(shared_psn_receiver &&) = delete;
+
+	~shared_psn_receiver() {
+		stop();
+	}
+
+	bool start(std::string &error) {
+		if(running_.load()) {
+			return true;
+		}
+
+		if(!receiver_.open(port_, multicast_address_, local_address_, error)) {
+			return false;
+		}
+
+		running_.store(true);
+		worker_ = std::thread([this]() {
+			receive_loop();
+		});
+		return true;
+	}
+
+	void stop() {
+		if(!running_.exchange(false)) {
+			return;
+		}
+
+		receiver_.close();
+		if(worker_.joinable()) {
+			worker_.join();
+		}
+	}
+
+	void add_callback(void *owner, std::function<void(const std::vector<output_event> &, const std::vector<output_event> &)> callback) {
+		std::lock_guard<std::mutex> lock(callback_mutex_);
+		callbacks_.push_back({owner, std::move(callback)});
+	}
+
+	void remove_callback(void *owner) {
+		std::lock_guard<std::mutex> lock(callback_mutex_);
+		callbacks_.erase(
+			std::remove_if(callbacks_.begin(), callbacks_.end(), [owner](const tagged_callback &callback) {
+				return callback.owner == owner;
+			}),
+			callbacks_.end()
+		);
+	}
+
+	size_t callback_count() const {
+		std::lock_guard<std::mutex> lock(callback_mutex_);
+		return callbacks_.size();
+	}
+
+private:
+	void receive_loop() {
+		std::array<char, psn::MAX_UDP_PACKET_SIZE> buffer{};
+
+		broadcast({}, {output_event{{"status", 1}}});
+
+		while(running_.load()) {
+			const long byte_count{receiver_.receive(buffer.data(), buffer.size())};
+			if(byte_count <= 0) {
+				continue;
+			}
+
+			if(!decoder_.decode(buffer.data(), (size_t)byte_count)) {
+				broadcast({}, {output_event{{"error", "decode failed"}}});
+				continue;
+			}
+
+			std::vector<output_event> tracker_events;
+			std::vector<output_event> info_events;
+			collect_info_events(info_events);
+			collect_tracker_events(tracker_events);
+			if(!tracker_events.empty() || !info_events.empty()) {
+				broadcast(tracker_events, info_events);
+			}
+		}
+	}
+
+	void collect_info_events(std::vector<output_event> &info_events) {
+		const auto &info = decoder_.get_info();
+		if((!has_info_frame_ || last_info_frame_id_ != info.header.frame_id) && !info.system_name.empty()) {
+			has_info_frame_ = true;
+			last_info_frame_id_ = info.header.frame_id;
+			info_events.push_back({{"server", info.system_name}});
+			for(const auto &entry : info.tracker_names) {
+				tracker_names_[entry.first] = entry.second;
+				info_events.push_back({{"name", entry.first, entry.second}});
+			}
+		}
+	}
+
+	void collect_tracker_events(std::vector<output_event> &tracker_events) {
+		const auto &data = decoder_.get_data();
+		if(!has_data_frame_ || last_data_frame_id_ != data.header.frame_id) {
+			has_data_frame_ = true;
+			last_data_frame_id_ = data.header.frame_id;
+			for(const auto &entry : data.trackers) {
+				tracker_events.push_back(make_tracker_event(entry.second));
+			}
+		}
+	}
+
+	output_event make_tracker_event(const psn::tracker &tracker) const {
+		const auto position = tracker.get_pos();
+		const auto orientation = tracker.get_ori();
+		const auto tracker_id = (int)tracker.get_id();
+		std::string tracker_name;
+		const auto name_iterator = tracker_names_.find(tracker_id);
+		if(name_iterator != tracker_names_.end()) {
+			tracker_name = name_iterator->second;
+		}
+
+		return {{
+			"tracker",
+			tracker_id,
+			tracker_name,
+			(double)position.x,
+			(double)position.y,
+			(double)position.z,
+			(double)orientation.x,
+			(double)orientation.y,
+			(double)orientation.z,
+			(double)tracker.get_status(),
+			(double)tracker.get_timestamp()
+		}};
+	}
+
+	void broadcast(const std::vector<output_event> &tracker_events, const std::vector<output_event> &info_events) {
+		std::lock_guard<std::mutex> lock(callback_mutex_);
+		for(const auto &callback : callbacks_) {
+			callback.function(tracker_events, info_events);
+		}
+	}
+
+	uint16_t port_;
+	std::string multicast_address_;
+	std::string local_address_;
+	udp_receiver receiver_;
+	psn::psn_decoder decoder_;
+	std::atomic<bool> running_{false};
+	std::thread worker_;
+	mutable std::mutex callback_mutex_;
+	std::vector<tagged_callback> callbacks_;
+	std::map<int, std::string> tracker_names_;
+	uint8_t last_info_frame_id_{0};
+	uint8_t last_data_frame_id_{0};
+	bool has_info_frame_{false};
+	bool has_data_frame_{false};
+};
+
+struct receiver_key {
+	uint16_t port;
+	std::string multicast_address;
+	std::string local_address;
+
+	bool operator<(const receiver_key &rhs) const {
+		if(port != rhs.port) {
+			return port < rhs.port;
+		}
+		if(multicast_address != rhs.multicast_address) {
+			return multicast_address < rhs.multicast_address;
+		}
+		return local_address < rhs.local_address;
+	}
+};
+
+std::string normalize_address_key(const std::string &address, const std::string &any_value) {
+	const std::string value{normalized_symbol_text(address)};
+	if(value.empty() || value == "any" || value == "0.0.0.0") {
+		return any_value;
+	}
+	return value;
+}
+
+std::string normalize_multicast_key(const std::string &multicast_address) {
+	if(multicast_is_disabled(multicast_address)) {
+		return "none";
+	}
+	return normalize_address_key(multicast_address, "none");
+}
+
+std::string normalize_local_address_key(const std::string &local_address) {
+	return normalize_address_key(local_address, "any");
+}
+
+class receiver_registry {
+public:
+	static receiver_registry &shared() {
+		static receiver_registry instance;
+		return instance;
+	}
+
+	std::shared_ptr<shared_psn_receiver> get(uint16_t port, const std::string &multicast_address, const std::string &local_address, std::string &error) {
+		std::lock_guard<std::mutex> lock(mutex_);
+		receiver_key key{port, normalize_multicast_key(multicast_address), normalize_local_address_key(local_address)};
+		const auto iterator = receivers_.find(key);
+		if(iterator != receivers_.end()) {
+			return iterator->second;
+		}
+
+		auto receiver = std::make_shared<shared_psn_receiver>(port, key.multicast_address, key.local_address);
+		if(!receiver->start(error)) {
+			return nullptr;
+		}
+		receivers_.insert(std::make_pair(key, receiver));
+		return receiver;
+	}
+
+	void release(uint16_t port, const std::string &multicast_address, const std::string &local_address) {
+		std::shared_ptr<shared_psn_receiver> receiver_to_destroy;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			receiver_key key{port, normalize_multicast_key(multicast_address), normalize_local_address_key(local_address)};
+			const auto iterator = receivers_.find(key);
+			if(iterator != receivers_.end() && iterator->second->callback_count() == 0) {
+				receiver_to_destroy = iterator->second;
+				receivers_.erase(iterator);
+			}
+		}
+	}
+
+private:
+	receiver_registry() = default;
+	std::mutex mutex_;
+	std::map<receiver_key, std::shared_ptr<shared_psn_receiver>> receivers_;
+};
+
 class bbb_psn_receiver : public c74::min::object<bbb_psn_receiver> {
 public:
 	MIN_DESCRIPTION{"Receive and decode PosiStageNet tracking data over UDP"};
@@ -266,7 +513,10 @@ public:
 
 	c74::min::message<> bang_message{this, "bang", "Report receiver status.",
 		MIN_FUNCTION {
-			push_info({"status", running_.load() ? 1 : 0});
+			push_info({"status", receiver_ ? 1 : 0});
+			if(receiver_) {
+				push_info({"subscribers", (int)receiver_->callback_count()});
+			}
 			output_queue.set();
 			return {};
 		}
@@ -281,7 +531,6 @@ public:
 		}
 	};
 
-
 	c74::min::queue<> output_queue{this,
 		MIN_FUNCTION {
 			flush_output();
@@ -295,14 +544,11 @@ public:
 
 private:
 	void start() {
-		if(running_.load()) {
+		if(receiver_) {
 			push_info({"status", 1});
+			push_info({"subscribers", (int)receiver_->callback_count()});
 			output_queue.set();
 			return;
-		}
-
-		if(worker_.joinable()) {
-			worker_.join();
 		}
 
 		const int requested_port{(int)port};
@@ -312,115 +558,55 @@ private:
 			return;
 		}
 
-		const c74::min::atoms multicast_atoms{multicast.get_atoms()};
-		const std::string requested_multicast{multicast_atoms.empty() ? "" : std::string(multicast_atoms[0])};
-		const c74::min::atoms local_address_atoms{localaddr.get_atoms()};
-		const std::string requested_local_address{local_address_atoms.empty() ? "any" : std::string(local_address_atoms[0])};
+		active_port_ = (uint16_t)requested_port;
+		active_multicast_ = attribute_symbol_to_string(multicast, "");
+		active_local_address_ = attribute_symbol_to_string(localaddr, "any");
 
-		running_.store(true);
-		worker_ = std::thread([this, requested_port, requested_multicast, requested_local_address]() {
-			receive_loop((uint16_t)requested_port, requested_multicast, requested_local_address);
-		});
-	}
-
-	void stop(bool report_status = true) {
-		const bool was_running{running_.exchange(false)};
-
-		if(worker_.joinable()) {
-			worker_.join();
-		}
-
-		if(report_status && was_running) {
-			push_info({"status", 0});
-			output_queue.set();
-		}
-	}
-
-	void receive_loop(uint16_t requested_port, const std::string requested_multicast, const std::string requested_local_address) {
-		udp_receiver receiver;
 		std::string error;
-		if(!receiver.open(requested_port, requested_multicast, requested_local_address, error)) {
-			running_.store(false);
+		auto receiver = receiver_registry::shared().get(active_port_, active_multicast_, active_local_address_, error);
+		if(!receiver) {
 			push_info({"error", error});
 			push_info({"status", 0});
 			output_queue.set();
 			return;
 		}
 
-		psn::psn_decoder decoder;
-		std::array<char, psn::MAX_UDP_PACKET_SIZE> buffer{};
-		uint8_t last_info_frame_id{0};
-		uint8_t last_data_frame_id{0};
-		bool has_info_frame{false};
-		bool has_data_frame{false};
-
-		push_info({"status", 1});
-		output_queue.set();
-
-		while(running_.load()) {
-			const long byte_count{receiver.receive(buffer.data(), buffer.size())};
-			if(byte_count <= 0) {
-				continue;
-			}
-
-			if(!decoder.decode(buffer.data(), (size_t)byte_count)) {
-				push_info({"error", "decode failed"});
-				output_queue.set();
-				continue;
-			}
-
-			const auto &info = decoder.get_info();
-			if((!has_info_frame || last_info_frame_id != info.header.frame_id) && !info.system_name.empty()) {
-				has_info_frame = true;
-				last_info_frame_id = info.header.frame_id;
-				push_info({"server", info.system_name});
-				for(const auto &entry : info.tracker_names) {
-					tracker_names_[entry.first] = entry.second;
-					push_info({"name", entry.first, entry.second});
-				}
-				output_queue.set();
-			}
-
-			const auto &data = decoder.get_data();
-			if(!has_data_frame || last_data_frame_id != data.header.frame_id) {
-				has_data_frame = true;
-				last_data_frame_id = data.header.frame_id;
-				for(const auto &entry : data.trackers) {
-					push_tracker(entry.second);
-				}
-				output_queue.set();
-			}
-		}
-	}
-
-	void push_tracker(const psn::tracker &tracker) {
-		const auto position = tracker.get_pos();
-		const auto orientation = tracker.get_ori();
-		const auto tracker_id = (int)tracker.get_id();
-		std::string tracker_name;
-		const auto name_iterator = tracker_names_.find(tracker_id);
-		if(name_iterator != tracker_names_.end()) {
-			tracker_name = name_iterator->second;
-		}
-
-		push_tracker_atoms({
-			"tracker",
-			tracker_id,
-			tracker_name,
-			(double)position.x,
-			(double)position.y,
-			(double)position.z,
-			(double)orientation.x,
-			(double)orientation.y,
-			(double)orientation.z,
-			(double)tracker.get_status(),
-			(double)tracker.get_timestamp()
+		receiver_ = receiver;
+		receiver_->add_callback(this, [this](const std::vector<output_event> &tracker_events, const std::vector<output_event> &info_events) {
+			enqueue_events(tracker_events, info_events);
 		});
+		push_info({"status", 1});
+		push_info({"subscribers", (int)receiver_->callback_count()});
+		output_queue.set();
 	}
 
-	void push_tracker_atoms(c74::min::atoms values) {
-		std::lock_guard<std::mutex> lock(output_mutex_);
-		tracker_events_.push_back({std::move(values)});
+	void stop(bool report_status = true) {
+		if(!receiver_) {
+			return;
+		}
+
+		receiver_->remove_callback(this);
+		receiver_.reset();
+		receiver_registry::shared().release(active_port_, active_multicast_, active_local_address_);
+
+		if(report_status) {
+			push_info({"status", 0});
+			output_queue.set();
+		}
+	}
+
+	std::string attribute_symbol_to_string(c74::min::attribute<c74::min::symbol> &attribute, const std::string &fallback) const {
+		const c74::min::atoms values{attribute.get_atoms()};
+		return values.empty() ? fallback : std::string(values[0]);
+	}
+
+	void enqueue_events(const std::vector<output_event> &tracker_events, const std::vector<output_event> &info_events) {
+		{
+			std::lock_guard<std::mutex> lock(output_mutex_);
+			tracker_events_.insert(tracker_events_.end(), tracker_events.begin(), tracker_events.end());
+			info_events_.insert(info_events_.end(), info_events.begin(), info_events.end());
+		}
+		output_queue.set();
 	}
 
 	void push_info(c74::min::atoms values) {
@@ -445,12 +631,13 @@ private:
 		}
 	}
 
-	std::atomic<bool> running_{false};
-	std::thread worker_;
+	std::shared_ptr<shared_psn_receiver> receiver_;
 	std::mutex output_mutex_;
 	std::vector<output_event> tracker_events_;
 	std::vector<output_event> info_events_;
-	std::map<int, std::string> tracker_names_;
+	uint16_t active_port_{0};
+	std::string active_multicast_;
+	std::string active_local_address_;
 };
 
 MIN_EXTERNAL(bbb_psn_receiver);

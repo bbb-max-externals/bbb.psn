@@ -242,7 +242,7 @@
             420.0,
             40.0
           ],
-          "text": "out 2: server <name>, name <id> <name>, status <0|1>, error <message>"
+          "text": "out 2: server/name/status/error/subscribers. Same port+multicast+localaddr objects share one receiver."
         }
       },
       {
