@@ -1,5 +1,8 @@
 # bbb.psn
 
+> [!WARNING]
+> This repository is published as AI-assisted, insufficiently tested work in progress ("AI slop"). Treat it as experimental. Correctness, stability, compatibility, and fitness for production use are not guaranteed.
+
 Max/MSP external package for sending and receiving PosiStageNet (PSN) tracking data.
 
 ## Object
